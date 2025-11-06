@@ -110,7 +110,8 @@ REPUTATION DATA:
 - AbuseIPDB Reports: {len(report.reputation.abuseipdb_reports or [])} recent reports
 - OTX Pulse Count: {report.reputation.otx_pulse_count} (CRITICAL INDICATOR)
 - OTX Pulses: {json.dumps(report.reputation.otx_pulses[:3] if report.reputation.otx_pulses else [], indent=2)}
-- VirusTotal Detections: {json.dumps(report.reputation.virustotal_detections)}
+- VirusTotal Detections (summary): {json.dumps(report.reputation.virustotal_detections)}
+- VirusTotal Related URLs (top 5): {json.dumps(report.virustotal_related_urls[:5] if report.virustotal_related_urls else [], indent=2)}
 
 GEOLOCATION DATA:
 - Country (IPinfo): {report.geolocation.ipinfo_country}

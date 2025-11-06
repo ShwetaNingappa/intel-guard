@@ -48,6 +48,7 @@ class UnifiedReport(BaseModel):
     geolocation: GeolocationData
     ownership: OwnershipData
     news_articles: List[Dict[str, Any]] = Field(default_factory=list, description="News articles from News API")
+    virustotal_related_urls: List[Dict[str, Any]] = Field(default_factory=list, description="URLs related to this IP from VirusTotal with detection stats")
     raw_data: Dict[str, Any] = Field(default_factory=dict, description="Raw API responses for detailed analysis")
 
 
@@ -58,6 +59,7 @@ class ThreatCheckResponse(BaseModel):
     geolocation: GeolocationData
     ownership: OwnershipData
     news_articles: List[Dict[str, Any]]
+    virustotal_related_urls: List[Dict[str, Any]]
     raw_data: Dict[str, Any]
     final_threat_score: int
     ai_rationale: str

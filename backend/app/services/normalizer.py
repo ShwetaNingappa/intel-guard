@@ -12,7 +12,7 @@ class DataNormalizer:
         
         Args:
             ip: The IP address being analyzed
-            raw_results: Dictionary containing responses from all 7 APIs
+            raw_results: Dictionary containing responses from all external APIs
             
         Returns:
             UnifiedReport object with normalized data
@@ -28,6 +28,9 @@ class DataNormalizer:
         
         # Extract news articles
         news_articles = DataNormalizer._extract_news_articles(raw_results)
+
+        # Extract VirusTotal related URLs
+        vt_related_urls = DataNormalizer._extract_virustotal_related_urls(raw_results)
         
         return UnifiedReport(
             ip_address=ip,
@@ -35,12 +38,13 @@ class DataNormalizer:
             geolocation=geolocation,
             ownership=ownership,
             news_articles=news_articles,
+            virustotal_related_urls=vt_related_urls,
             raw_data=raw_results
         )
     
     @staticmethod
     def _extract_reputation(raw_results: Dict[str, Any]) -> ReputationData:
-        """Extract and normalize reputation data from AbuseIPDB, VirusTotal, and Risk APIs."""
+        """Extract and normalize reputation data from AbuseIPDB, OTX, and VirusTotal."""
         reputation = ReputationData()
         
         # AbuseIPDB data
@@ -78,15 +82,31 @@ class DataNormalizer:
                     for pulse in pulses[:5]  # Limit to 5 most relevant pulses
                 ]
         
-        # VirusTotal data (not used - no API key provided)
-        # Keeping structure for optional future use
-        reputation.virustotal_detections = {
-            "malicious": 0,
-            "suspicious": 0,
-            "harmless": 0,
-            "undetected": 0,
-            "total_votes": {}
-        }
+        # VirusTotal detections (summary if available)
+        if raw_results.get("virustotal", {}).get("success"):
+            vt = raw_results["virustotal"].get("data", {})
+            # Some VT endpoints return {"data": {"attributes": {"last_analysis_stats": {...}}}}
+            attrs = vt.get("data", {}).get("attributes") if isinstance(vt.get("data"), dict) else vt.get("attributes")
+            stats = None
+            if isinstance(attrs, dict):
+                stats = attrs.get("last_analysis_stats")
+            # Fallback to zeroed structure if not present
+            if isinstance(stats, dict):
+                reputation.virustotal_detections = stats
+            else:
+                reputation.virustotal_detections = {
+                    "malicious": 0,
+                    "suspicious": 0,
+                    "harmless": 0,
+                    "undetected": 0,
+                }
+        else:
+            reputation.virustotal_detections = {
+                "malicious": 0,
+                "suspicious": 0,
+                "harmless": 0,
+                "undetected": 0,
+            }
         
         return reputation
     
@@ -189,3 +209,25 @@ class DataNormalizer:
                 })
         
         return articles
+
+    @staticmethod
+    def _extract_virustotal_related_urls(raw_results: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Extract related URLs from VirusTotal response if available."""
+        urls: List[Dict[str, Any]] = []
+        vt = raw_results.get("virustotal", {})
+        if vt.get("success"):
+            vt_data = vt.get("data", {})
+            # The relationships endpoint typically returns {"data": [ {...}, ... ]}
+            items = vt_data.get("data") if isinstance(vt_data, dict) else None
+            if isinstance(items, list):
+                for item in items[:50]:  # cap to 50 for UI/AI prompt size
+                    attrs = item.get("attributes", {}) if isinstance(item, dict) else {}
+                    stats = attrs.get("last_analysis_stats", {}) if isinstance(attrs, dict) else {}
+                    url_value = item.get("id") or attrs.get("url")
+                    last_submission = attrs.get("last_submission_date")
+                    urls.append({
+                        "url": url_value,
+                        "last_analysis_stats": stats,
+                        "last_submission_date": last_submission,
+                    })
+        return urls

@@ -23,11 +23,13 @@ import {
 } from '@chakra-ui/react';
 import { checkIP } from './services/api';
 import ThreatScore from './components/ThreatScore';
-import DetectionChart from './components/DetectionChart';
-import DataPanel from './components/DataPanel';
+import SourceScores from './components/SourceScores';
+import CategoryList from './components/CategoryList';
+import GeoCard from './components/GeoCard';
+import RelatedURLs from './components/RelatedURLs';
 import ReportIPForm from './components/ReportIPForm';
-import NewsCampaigns from './components/NewsCampaigns';
-import NewsArticles from './components/NewsArticles';
+import VirusTotalURLTable from './components/VirusTotalURLTable';
+import RawDataViewer from './components/RawDataViewer';
 
 // Dark mode theme configuration
 const config = {
@@ -124,54 +126,40 @@ function App() {
         <Container maxW="container.xl">
           <VStack spacing={8} align="stretch">
             {/* Header */}
-            <Box textAlign="center">
+            <Box textAlign="left" p={6} bg="gray.800" borderRadius="lg" borderWidth="1px" borderColor="#2A2F3A" boxShadow="0 0 0 1px #2A2F3A, 0 0 20px rgba(0,255,255,0.10)">
               <Heading 
-                size="2xl" 
-                mb={2} 
-                bgGradient="linear(to-r, blue.400, cyan.400)"
-                bgClip="text"
+                size="xl" 
+                mb={1} 
+                color="cyan.300"
+                textShadow="0 0 12px rgba(0,255,255,0.35)"
+                letterSpacing="widest"
               >
-                🛡️ IP Threat Aggregator
+                TechSpark's vision Engine
               </Heading>
-              <Text color="gray.400" fontSize="lg">
-                AI-Powered Multi-Source Threat Intelligence Analysis
-              </Text>
-              <Text color="gray.500" fontSize="sm" mt={2}>
-                Powered by 8 threat intelligence sources + Google Gemini AI + News API
-              </Text>
-            </Box>
+              <Text color="cyan.100" fontSize="sm" mb={4}>TICE - Threat Intelligence Dashboard</Text>
 
-            {/* Search Bar */}
-            <Box
-              p={6}
-              bg="gray.800"
-              borderRadius="lg"
-              shadow="2xl"
-              borderWidth="1px"
-              borderColor="gray.700"
-            >
               <HStack spacing={4}>
                 <Input
-                  placeholder="Enter IP address (e.g., 8.8.8.8)"
-                  size="lg"
+                  placeholder="Enter suspicious IP"
+                  size="md"
                   value={ipAddress}
                   onChange={(e) => setIPAddress(e.target.value)}
                   onKeyPress={handleKeyPress}
                   bg="gray.900"
                   borderColor="gray.600"
-                  _hover={{ borderColor: 'blue.500' }}
-                  _focus={{ borderColor: 'blue.400', boxShadow: '0 0 0 1px #3182CE' }}
+                  _hover={{ borderColor: 'cyan.400' }}
+                  _focus={{ borderColor: 'cyan.300', boxShadow: '0 0 0 1px #00B5D8' }}
                   color="white"
                 />
                 <Button
-                  colorScheme="blue"
-                  size="lg"
+                  colorScheme="red"
+                  size="md"
                   onClick={handleSearch}
                   isLoading={loading}
-                  loadingText="Analyzing..."
-                  minW="150px"
+                  loadingText="Lookup..."
+                  minW="120px"
                 >
-                  Analyze IP
+                  Lookup
                 </Button>
               </HStack>
             </Box>
@@ -200,30 +188,24 @@ function App() {
             {/* Results */}
             {threatData && !loading && (
               <VStack spacing={6} align="stretch">
-                {/* Main Threat Score - Full Width */}
-                <ThreatScore
-                  score={threatData.final_threat_score}
-                  rationale={threatData.ai_rationale}
-                />
-
-                {/* News Campaigns - Full Width */}
-                {threatData.related_campaign_news && threatData.related_campaign_news.length > 0 && (
-                  <NewsCampaigns campaigns={threatData.related_campaign_news} />
-                )}
-
-                {/* News API Articles - Full Width */}
-                {threatData.news_articles && threatData.news_articles.length > 0 && (
-                  <NewsArticles articles={threatData.news_articles} />
-                )}
-
-                {/* Charts and Details in Grid */}
+                {/* Top Row: Score + Categories */}
                 <Grid templateColumns={{ base: '1fr', lg: 'repeat(2, 1fr)' }} gap={6}>
-                  <DetectionChart virustotal={threatData.reputation.virustotal_detections} />
-                  <DataPanel
-                    reputation={threatData.reputation}
-                    geolocation={threatData.geolocation}
-                    ownership={threatData.ownership}
-                  />
+                  <ThreatScore score={threatData.final_threat_score} rationale={threatData.ai_rationale} />
+                  <CategoryList reputation={threatData.reputation} rationale={threatData.ai_rationale} />
+                </Grid>
+
+                {/* Middle Row: Source Scores + Geolocation */}
+                <Grid templateColumns={{ base: '1fr', lg: 'repeat(2, 1fr)' }} gap={6}>
+                  <SourceScores reputation={threatData.reputation} ownership={threatData.ownership} />
+                  <GeoCard geolocation={threatData.geolocation} />
+                </Grid>
+
+                {/* Bottom Row: Related URLs (compact) + Detailed table */}
+                <Grid templateColumns={{ base: '1fr', lg: 'repeat(2, 1fr)' }} gap={6}>
+                  <RelatedURLs urls={threatData.virustotal_related_urls} />
+                  {Array.isArray(threatData.virustotal_related_urls) && threatData.virustotal_related_urls.length > 0 && (
+                    <VirusTotalURLTable urls={threatData.virustotal_related_urls} />
+                  )}
                 </Grid>
 
                 {/* Tabs for Additional Features */}
@@ -238,19 +220,7 @@ function App() {
                       <ReportIPForm initialIP={threatData.ip_address} />
                     </TabPanel>
                     <TabPanel px={0}>
-                      <Box
-                        p={4}
-                        bg="gray.900"
-                        color="green.300"
-                        borderRadius="md"
-                        borderWidth="1px"
-                        borderColor="gray.700"
-                        overflowX="auto"
-                        fontSize="sm"
-                        fontFamily="monospace"
-                      >
-                        <pre>{JSON.stringify(threatData.raw_data, null, 2)}</pre>
-                      </Box>
+                      <RawDataViewer rawData={threatData.raw_data} ip={threatData.ip_address} />
                     </TabPanel>
                   </TabPanels>
                 </Tabs>

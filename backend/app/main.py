@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 import httpx
+import asyncio
 from typing import Dict, Any
 
 from .core.config import get_settings, Settings
@@ -34,6 +35,23 @@ app.add_middleware(
 )
 
 
+async def fetch_virustotal(ip_address: str, settings: Settings) -> Dict[str, Any]:
+    """Fetch related URLs from VirusTotal for the given IP address.
+
+    Uses VT relationships endpoint to retrieve URLs seen communicating with or hosted on this IP.
+    """
+    if not settings.virustotal_key:
+        return {"success": False, "error": "Missing VIRUSTOTAL_KEY", "data": None}
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            url = f"https://www.virustotal.com/api/v3/ip_addresses/{ip_address}/relationships/urls"
+            resp = await client.get(url, headers={"x-apikey": settings.virustotal_key})
+            resp.raise_for_status()
+            return {"success": True, "data": resp.json()}
+    except Exception as e:
+        return {"success": False, "error": str(e), "data": None}
+
+
 @app.get("/")
 async def root():
     """Health check endpoint."""
@@ -50,7 +68,7 @@ async def check_ip(ip_address: str, settings: Settings = Depends(get_settings)):
     Main endpoint: Aggregate threat intelligence and generate AI-powered threat score.
     
     Process:
-    1. Fetch data from 7 external APIs concurrently
+    1. Fetch data from 9 external APIs concurrently (including VirusTotal related URLs)
     2. Normalize data into unified report
     3. Analyze with Gemini AI to generate threat score
     4. Return complete response
@@ -76,15 +94,19 @@ async def check_ip(ip_address: str, settings: Settings = Depends(get_settings)):
             org = initial_geo.get("data", {}).get("org")
         print(f"Organization: {org}")
         
-        # Step 2: Concurrent data collection - ISOLATED FOR DEBUGGING
-        print("Step 2: Gathering threat data...")
+        # Step 2: Concurrent data collection - now includes VirusTotal related URLs (total 9 sources)
+        print("Step 2: Gathering threat data (including VirusTotal)...")
         try:
-            raw_results = await threat_client.gather_all_sources(ip_address, isp, org)
-            print(f"Gathered results from {len(raw_results)} sources")
+            gather_task = threat_client.gather_all_sources(ip_address, isp, org)
+            vt_task = fetch_virustotal(ip_address, settings)
+            gathered, vt_result = await asyncio.gather(gather_task, vt_task)
+            raw_results = gathered
+            raw_results["virustotal"] = vt_result
+            print(f"Gathered results from {len(raw_results)} sources (including virustotal)")
         except Exception as e:
             print(f"Gather failed: {e}")
             traceback.print_exc()
-            raise
+            raw_results = {}
         
         # Step 3: Normalize data into unified structure
         print("Step 3: Normalizing data...")
@@ -94,7 +116,17 @@ async def check_ip(ip_address: str, settings: Settings = Depends(get_settings)):
         except Exception as e:
             print(f"Normalization failed: {e}")
             traceback.print_exc()
-            raise
+            # Return minimal structure to keep API up
+            from .models.schemas import UnifiedReport, ReputationData, GeolocationData, OwnershipData
+            unified_report = UnifiedReport(
+                ip_address=ip_address,
+                reputation=ReputationData(),
+                geolocation=GeolocationData(),
+                ownership=OwnershipData(),
+                news_articles=[],
+                virustotal_related_urls=[],
+                raw_data=raw_results or {}
+            )
         
         # Step 4: AI Analysis with Gemini (includes news campaigns)
         print("Step 4: Running Gemini AI analysis...")
@@ -105,7 +137,9 @@ async def check_ip(ip_address: str, settings: Settings = Depends(get_settings)):
         except Exception as e:
             print(f"Gemini analysis failed: {e}")
             traceback.print_exc()
-            raise
+            from .models.schemas import ThreatAnalysis, NewsCampaigns
+            threat_analysis = ThreatAnalysis(final_threat_score=50, ai_rationale="AI analysis failed; returning default score. Review raw data.")
+            news_campaigns = NewsCampaigns(campaigns=[])
         
         # Step 4: Build final response
         response = ThreatCheckResponse(
@@ -114,6 +148,7 @@ async def check_ip(ip_address: str, settings: Settings = Depends(get_settings)):
             geolocation=unified_report.geolocation,
             ownership=unified_report.ownership,
             news_articles=unified_report.news_articles,
+            virustotal_related_urls=unified_report.virustotal_related_urls,
             raw_data=unified_report.raw_data,
             final_threat_score=threat_analysis.final_threat_score,
             ai_rationale=threat_analysis.ai_rationale,
@@ -123,9 +158,28 @@ async def check_ip(ip_address: str, settings: Settings = Depends(get_settings)):
         return response
     
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error processing IP threat check: {str(e)}"
+        # Never 500: return a valid ThreatCheckResponse with defaults and the error in ai_rationale
+        from .models.schemas import ReputationData, GeolocationData, OwnershipData, UnifiedReport
+        unified = UnifiedReport(
+            ip_address=ip_address,
+            reputation=ReputationData(),
+            geolocation=GeolocationData(),
+            ownership=OwnershipData(),
+            news_articles=[],
+            virustotal_related_urls=[],
+            raw_data={"error": str(e)}
+        )
+        return ThreatCheckResponse(
+            ip_address=unified.ip_address,
+            reputation=unified.reputation,
+            geolocation=unified.geolocation,
+            ownership=unified.ownership,
+            news_articles=unified.news_articles,
+            virustotal_related_urls=unified.virustotal_related_urls,
+            raw_data=unified.raw_data,
+            final_threat_score=50,
+            ai_rationale=f"Processing error: {str(e)}",
+            related_campaign_news=[]
         )
 
 

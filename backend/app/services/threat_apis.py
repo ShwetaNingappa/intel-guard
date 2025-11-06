@@ -13,6 +13,8 @@ class ThreatAPIClient:
     
     async def fetch_abuseipdb(self, ip: str) -> Dict[str, Any]:
         """Query AbuseIPDB API for IP reputation."""
+        if not self.settings.abuseipdb_key:
+            return {"success": False, "error": "Missing ABUSEIPDB_KEY", "data": None}
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.get(
@@ -54,6 +56,8 @@ class ThreatAPIClient:
     
     async def fetch_ipstack(self, ip: str) -> Dict[str, Any]:
         """Query IPStack API for detailed geolocation."""
+        if not self.settings.ipstack_key:
+            return {"success": False, "error": "Missing IPSTACK_KEY", "data": None}
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.get(
@@ -67,6 +71,8 @@ class ThreatAPIClient:
     
     async def fetch_whoisxml(self, ip: str) -> Dict[str, Any]:
         """Query WhoisXML API for WHOIS information."""
+        if not self.settings.whoisxml_key:
+            return {"success": False, "error": "Missing WHOISXML_KEY", "data": None}
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.get(
@@ -84,6 +90,8 @@ class ThreatAPIClient:
     
     async def fetch_securitytrails(self, ip: str) -> Dict[str, Any]:
         """Query SecurityTrails API for historical IP data."""
+        if not self.settings.securitytrails_key:
+            return {"success": False, "error": "Missing SECURITYTRAILS_KEY", "data": None}
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.get(
@@ -97,6 +105,8 @@ class ThreatAPIClient:
     
     async def fetch_otx(self, ip: str) -> Dict[str, Any]:
         """Query AlienVault OTX (Open Threat Exchange) for threat intelligence."""
+        if not self.settings.otx_key:
+            return {"success": False, "error": "Missing OTX_KEY", "data": None}
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.get(
