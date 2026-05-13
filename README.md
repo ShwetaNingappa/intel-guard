@@ -280,7 +280,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 📧 Support
 
-For issues, questions, or contributions, please open an issue on the [GitHub repository](https://github.com/vaish173/TechSpark_18).
+For issues, questions, or contributions, please open an issue on the [GitHub repository](https://github.com/ShwetaNingappa/intel-guard.git).
 
 ## 🔒 Security Note
 
@@ -292,6 +292,3 @@ For issues, questions, or contributions, please open an issue on the [GitHub rep
 ---
 
 **Made with ❤️ for cybersecurity professionals and threat researchers**
-
-#   T h r e a t - I n t e l l i g e n c e - E n g i n e  
- 
